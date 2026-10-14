@@ -76,6 +76,7 @@ export const StudyTimer: React.FC<StudyTimerProps> = ({
 
   // Save Modal state
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [sessionDurationToSave, setSessionDurationToSave] = useState(0);
   const [sessionNotes, setSessionNotes] = useState('');
   const [biblePassage, setBiblePassage] = useState('');
@@ -335,65 +336,73 @@ export const StudyTimer: React.FC<StudyTimerProps> = ({
     setShowSaveModal(true);
   };
 
-  // Confirm Save Session Modal
+  // Confirm Save Session Modal - 100% Unique Protection
   const confirmSaveSession = () => {
-    const todayStr = getTodayDateString();
-    const newSession: PracticeSession = {
-      id: `sess-${Date.now()}`,
-      habitId: currentHabit.id,
-      habitName: currentHabit.name,
-      category: currentHabit.category,
-      color: currentHabit.color,
-      startTime: sessionStartTime || Date.now() - sessionDurationToSave * 1000,
-      endTime: Date.now(),
-      durationSeconds: sessionDurationToSave,
-      mode,
-      notes: biblePassage.trim()
-        ? `[Passagem: ${biblePassage.trim()}] ${sessionNotes.trim()}`
-        : sessionNotes.trim(),
-      rating: sessionRating,
-      date: todayStr,
-    };
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
-    savePracticeSession(newSession);
-    onSessionSaved(newSession);
+    try {
+      const todayStr = getTodayDateString();
+      const uniqueId = `sess-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      const newSession: PracticeSession = {
+        id: uniqueId,
+        habitId: currentHabit.id,
+        habitName: currentHabit.name,
+        category: currentHabit.category,
+        color: currentHabit.color,
+        startTime: sessionStartTime || Date.now() - sessionDurationToSave * 1000,
+        endTime: Date.now(),
+        durationSeconds: sessionDurationToSave,
+        mode,
+        notes: biblePassage.trim()
+          ? `[Passagem: ${biblePassage.trim()}] ${sessionNotes.trim()}`
+          : sessionNotes.trim(),
+        rating: sessionRating,
+        date: todayStr,
+      };
 
-    // Auto mark habit as completed in today's tracker
-    if (currentHabit.id && onHabitLogsUpdated) {
-      const logs = getHabitLogs();
-      if (!logs[todayStr]?.[currentHabit.id]) {
-        const { allLogs } = toggleHabitCompletion(todayStr, currentHabit.id);
-        onHabitLogsUpdated(allLogs);
+      savePracticeSession(newSession);
+      onSessionSaved(newSession);
+
+      // Auto mark habit as completed in today's tracker
+      if (currentHabit.id && onHabitLogsUpdated) {
+        const logs = getHabitLogs();
+        if (!logs[todayStr]?.[currentHabit.id]) {
+          const { allLogs } = toggleHabitCompletion(todayStr, currentHabit.id);
+          onHabitLogsUpdated(allLogs);
+        }
       }
-    }
 
-    // Append to daily journal reflections & verse if available
-    const journal = getDailyJournal(todayStr);
-    if (biblePassage.trim() && !journal.verseOfDay) {
-      journal.verseOfDay = biblePassage.trim();
-    }
-    if (sessionNotes.trim() || biblePassage.trim()) {
-      const noteLine = `• [${currentHabit.icon} ${currentHabit.name} - ${formatSecondsToHuman(sessionDurationToSave)}] ${
-        biblePassage.trim() ? `(Passagem: ${biblePassage.trim()}) ` : ''
-      }${sessionNotes.trim()}`;
-      journal.reflections = journal.reflections
-        ? `${journal.reflections}\n${noteLine}`
-        : `### Práticas e Sessões do Dia:\n${noteLine}`;
-    }
-    saveDailyJournal(journal);
+      // Append to daily journal reflections & verse if available
+      const journal = getDailyJournal(todayStr);
+      if (biblePassage.trim() && !journal.verseOfDay) {
+        journal.verseOfDay = biblePassage.trim();
+      }
+      if (sessionNotes.trim() || biblePassage.trim()) {
+        const noteLine = `• [${currentHabit.icon} ${currentHabit.name} - ${formatSecondsToHuman(sessionDurationToSave)}] ${
+          biblePassage.trim() ? `(Passagem: ${biblePassage.trim()}) ` : ''
+        }${sessionNotes.trim()}`;
+        journal.reflections = journal.reflections
+          ? `${journal.reflections}\n${noteLine}`
+          : `### Práticas e Sessões do Dia:\n${noteLine}`;
+      }
+      saveDailyJournal(journal);
 
-    setShowSaveModal(false);
-    setSessionNotes('');
-    setBiblePassage('');
-    setSessionRating(5);
-    handleReset();
+      setShowSaveModal(false);
+      setSessionNotes('');
+      setBiblePassage('');
+      setSessionRating(5);
+      handleReset();
 
-    confetti({
-      particleCount: 60,
-      spread: 50,
-      origin: { y: 0.7 },
-      colors: [currentHabit.color, '#6366f1', '#10b981', '#f59e0b', '#ffffff'],
-    });
+      confetti({
+        particleCount: 60,
+        spread: 50,
+        origin: { y: 0.7 },
+        colors: [currentHabit.color, '#6366f1', '#10b981', '#f59e0b', '#ffffff'],
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleAmbientChange = (type: 'none' | 'rain' | 'whitenoise' | 'binaural') => {
@@ -834,10 +843,11 @@ export const StudyTimer: React.FC<StudyTimerProps> = ({
                 Descartar
               </button>
               <button
+                disabled={isSubmitting}
                 onClick={confirmSaveSession}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-zinc-950 font-bold text-xs hover:brightness-110 transition-all shadow-lg shadow-amber-500/20"
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-zinc-950 font-bold text-xs hover:brightness-110 transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Salvar no Perfil & Diário
+                {isSubmitting ? 'Salvando...' : 'Salvar no Perfil & Diário'}
               </button>
             </div>
           </div>

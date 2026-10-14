@@ -245,11 +245,38 @@ export function toggleHabitCompletion(date: string, habitId: string): { complete
 }
 
 // Practice Sessions (Stopwatch / Pomodoro / Practice timer)
+// Helper to guarantee 100% unique sessions with zero duplication
+export function deduplicateSessions(sessions: PracticeSession[]): PracticeSession[] {
+  const seenIds = new Set<string>();
+  const seenSignatures = new Set<string>();
+  const uniqueList: PracticeSession[] = [];
+
+  for (const s of sessions) {
+    if (!s || !s.id) continue;
+    if (seenIds.has(s.id)) continue;
+
+    // Logical signature: same habit + same date + duration + within 4 seconds window
+    const timeWindow = Math.floor(s.startTime / 4000);
+    const signature = `${s.habitId || s.habitName}_${s.date}_${s.durationSeconds}_${timeWindow}`;
+    if (seenSignatures.has(signature)) continue;
+
+    seenIds.add(s.id);
+    seenSignatures.add(signature);
+    uniqueList.push(s);
+  }
+  return uniqueList;
+}
+
 export function getPracticeSessions(): PracticeSession[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.SESSIONS);
     if (!raw) return [];
-    return JSON.parse(raw) || [];
+    const parsed: PracticeSession[] = JSON.parse(raw) || [];
+    const unique = deduplicateSessions(parsed);
+    if (unique.length !== parsed.length) {
+      localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(unique));
+    }
+    return unique;
   } catch {
     return [];
   }
@@ -258,7 +285,26 @@ export function getPracticeSessions(): PracticeSession[] {
 export function savePracticeSession(session: PracticeSession): PracticeSession[] {
   try {
     const sessions = getPracticeSessions();
-    const updated = [session, ...sessions];
+
+    // Check if session with same ID already exists
+    if (sessions.some((s) => s.id === session.id)) {
+      return sessions;
+    }
+
+    // Check if identical session was already saved (same habit, date and duration within recent 5s)
+    const isDuplicate = sessions.some((s) => {
+      const sameHabit = s.habitId === session.habitId;
+      const sameDate = s.date === session.date;
+      const sameDuration = s.durationSeconds === session.durationSeconds;
+      const closeTime = Math.abs(s.startTime - session.startTime) < 5000;
+      return sameHabit && sameDate && sameDuration && closeTime;
+    });
+
+    if (isDuplicate) {
+      return sessions;
+    }
+
+    const updated = deduplicateSessions([session, ...sessions]);
     localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(updated));
     return updated;
   } catch (e) {

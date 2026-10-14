@@ -12,6 +12,7 @@ import {
   getHabitLogs,
   getPracticeSessions,
   calculatePersonalStats,
+  deduplicateSessions,
   isAppLocked,
   setAppUnlocked,
   HabitLogsMap
@@ -46,11 +47,11 @@ export default function App() {
   };
 
   const handleSessionSaved = (newSession: PracticeSession) => {
-    setSessions((prev) => [newSession, ...prev]);
+    setSessions((prev) => deduplicateSessions([newSession, ...prev]));
   };
 
   const handleSessionsChange = (updated: PracticeSession[]) => {
-    setSessions(updated);
+    setSessions(deduplicateSessions(updated));
   };
 
   const handleProfileUpdated = (updated: UserProfile) => {
