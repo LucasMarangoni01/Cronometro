@@ -1,0 +1,6 @@
+{
+  "name": "FocoDiário - Cronômetro & Diário de Estudos",
+  "description": "Cronômetro inteligente de estudos, diário de anotações organizado por dia e estatísticas de desempenho para uso pessoal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
